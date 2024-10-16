@@ -18,6 +18,9 @@ jobs:
        SSH_USER: ${{ secrets.SSH_USER }}
        SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
        SSH_HOST: ${{ secrets.FORPSI_PANTHEON_ADDRESS }}
+       JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY }}
+       SERVICE_NAME: test-service.service
+       EXEC_START: /usr/bin/my-command
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -39,3 +42,43 @@ jobs:
       - name: Test SSH connection
         run: |
            ssh staging "echo 'SSH Connection successful'"
+      - name: Generate the .service file
+        run: |
+            # Define the content of the service file
+            cat <<EOF > $SERVICE_NAME
+            [Unit]
+            Description=Service template for .NET services
+            After=network.target
+  
+            [Service]
+            ExecStart=$EXEC_START
+            Restart=always
+            User=ubuntu
+            Group=ubuntu
+            Environment=JWT_PRIVATE_KEY=$JWT_PRIVATE_KEY
+  
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+  
+            # Display the file to check its contents
+            cat $SERVICE_NAME
+      
+      - name: Transfer the .service file via SCP
+        run: |
+          # Use scp to securely copy the service file to the remote server
+          scp $SERVICE_NAME staging:/etc/systemd/system/$SERVICE_NAME
+          ssh staging << EOF
+          # Move the service file to the systemd folder
+          #sudo mv /home/${{ secrets.REMOTE_USER }}/my-service.service /etc/systemd/system/my-service.service
+          
+          # Reload systemd manager configuration
+          sudo systemctl daemon-reload
+          
+          # Restart the service
+          sudo systemctl restart $SERVICE_NAME
+          
+          # Enable the service to start on boot (optional)
+          sudo systemctl enable $SERVICE_NAME
+          EOF
+
