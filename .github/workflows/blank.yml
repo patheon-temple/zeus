@@ -11,20 +11,31 @@ on:
 jobs:
   # This workflow contains a single job called "build"
   build:
+    
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
-
+    env:
+       SSH_USER: ${{ secrets.SSH_USER }}
+       SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+       SSH_HOST: ${{ secrets.FORPSI_PANTHEON_ADDRESS }}
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
-
-      - name: Set up SSH key
+      
+      - name: Create SSH configuration
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key
-          chmod 600 private_key
-          ssh-keyscan -H ${{ secrets.FORPSI_PANTHEON_ADDRESS }} >> ~/.ssh/known_hosts
-
-      - name: Connect to remote server via SSH
+           mkdir -p ~/.ssh/
+           echo "$SSH_KEY" > ~/.ssh/staging.key
+           chmod 600 ~/.ssh/staging.key
+           cat >>~/.ssh/config <<END
+           Host staging
+             HostName $SSH_HOST
+             User $SSH_USER
+             IdentityFile ~/.ssh/staging.key
+             StrictHostKeyChecking no
+           END
+           
+      - name: Test SSH connection
         run: |
-          ssh -i private_key root@${{ secrets.FORPSI_PANTHEON_ADDRESS }} "echo 'SSH connection successful!'"
+           ssh staging "echo 'SSH Connection successful'"
